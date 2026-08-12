@@ -1,0 +1,26 @@
+# Environment
+.env
+
+# Secrets & runtime data
+keys/
+pending_codes.json
+.action_id.cache
+
+# Logs
+*.log
+*.err.log
+
+# Temp
+.temp/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
