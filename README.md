@@ -107,33 +107,34 @@ Local HTTP service for CAPTCHA solving.
 
 ## Supported Models
 
-Registered accounts and minted tokens can be used with [grok2api](https://github.com/chenyme/grok2api) to access the following models:
+Registered accounts and minted tokens can be used with [grok2api](https://github.com/chenyme/grok2api) to access the following models.
 
-### Web Pool (SSO accounts)
+### Free (Basic-tier accounts, no payment required)
 
-| Model | Capability | Minimum Tier |
+These are the models you get immediately after registration — no SuperGrok subscription needed:
+
+| Model | Capability | How to get |
 |---|---|---|
-| `grok-chat-fast` | Chat | Basic |
-| `grok-chat-auto` | Chat | Super |
-| `grok-chat-expert` | Chat | Super |
-| `grok-chat-heavy` | Chat | Heavy |
-| `grok-imagine-image` | Image generation | Basic |
+| `grok-chat-fast` | Chat (fast mode) | SSO token → Web pool |
+| `grok-imagine-image` | Image generation | SSO token → Web pool |
+| `grok-4.5` | Chat + reasoning + search, 1M output tokens | SSO → Device Flow (`sso_to_cpa.py`) → Build pool |
+
+> ✅ All three models above have been tested and confirmed working end-to-end.
+
+### Paid (requires SuperGrok / Heavy subscription)
+
+The following models are available in the codebase but require a paid account tier:
+
+| Model | Capability | Tier |
+|---|---|---|
+| `grok-chat-auto` | Chat (auto mode) | Super |
+| `grok-chat-expert` | Chat (expert mode) | Super |
+| `grok-chat-heavy` | Chat (heavy mode) | Heavy |
 | `grok-imagine-image-quality` | Image generation (HD) | Super |
 | `grok-imagine-image-edit` | Image editing | Super |
 | `grok-imagine-video` | Video generation | Super |
 
-### Build/Console Pool (Device Flow tokens)
-
-| Model | Capability | Max Output | Reasoning | Search |
-|---|---|---|---|---|
-| `grok-4.5` | Chat + Responses | 1M tokens | ✅ (effort: low/medium/high) | ✅ |
-| `grok-4.3` | Chat + Responses | 1M tokens | ✅ (effort: low/medium/high) | ✅ |
-| `grok-4.20-0309-reasoning` | Chat + Responses | 1M tokens | ✅ | ✅ |
-| `grok-4.20-0309-non-reasoning` | Chat + Responses | 1M tokens | ❌ | ✅ |
-| `grok-4.20-multi-agent-0309` | Chat + Responses | 1M tokens | ✅ (effort: low/medium/high/xhigh) | ✅ |
-| `grok-build-0.1` | Code / Composer | 256K tokens | ❌ | ✅ |
-
-> **Note**: Basic-tier web accounts (free registration) can use `grok-chat-fast` and `grok-imagine-image`. Console/Build models require Device Flow minted tokens via `sso_to_cpa.py`.
+Other Build/Console models available via Device Flow: `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`, `grok-4.20-multi-agent-0309`, `grok-build-0.1` (code/composer, 256K output).
 
 ## OAuth Device Flow
 
