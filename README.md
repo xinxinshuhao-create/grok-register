@@ -105,6 +105,36 @@ uv run python turnstile_solver_local.py
 
 Local HTTP service for CAPTCHA solving.
 
+## Supported Models
+
+Registered accounts and minted tokens can be used with [grok2api](https://github.com/chenyme/grok2api) to access the following models:
+
+### Web Pool (SSO accounts)
+
+| Model | Capability | Minimum Tier |
+|---|---|---|
+| `grok-chat-fast` | Chat | Basic |
+| `grok-chat-auto` | Chat | Super |
+| `grok-chat-expert` | Chat | Super |
+| `grok-chat-heavy` | Chat | Heavy |
+| `grok-imagine-image` | Image generation | Basic |
+| `grok-imagine-image-quality` | Image generation (HD) | Super |
+| `grok-imagine-image-edit` | Image editing | Super |
+| `grok-imagine-video` | Video generation | Super |
+
+### Build/Console Pool (Device Flow tokens)
+
+| Model | Capability | Max Output | Reasoning | Search |
+|---|---|---|---|---|
+| `grok-4.5` | Chat + Responses | 1M tokens | ✅ (effort: low/medium/high) | ✅ |
+| `grok-4.3` | Chat + Responses | 1M tokens | ✅ (effort: low/medium/high) | ✅ |
+| `grok-4.20-0309-reasoning` | Chat + Responses | 1M tokens | ✅ | ✅ |
+| `grok-4.20-0309-non-reasoning` | Chat + Responses | 1M tokens | ❌ | ✅ |
+| `grok-4.20-multi-agent-0309` | Chat + Responses | 1M tokens | ✅ (effort: low/medium/high/xhigh) | ✅ |
+| `grok-build-0.1` | Code / Composer | 256K tokens | ❌ | ✅ |
+
+> **Note**: Basic-tier web accounts (free registration) can use `grok-chat-fast` and `grok-imagine-image`. Console/Build models require Device Flow minted tokens via `sso_to_cpa.py`.
+
 ## OAuth Device Flow
 
 The `sso_to_cpa.py` script implements OAuth 2.0 Device Flow with the corrected scope:
