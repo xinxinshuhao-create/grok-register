@@ -96,13 +96,16 @@ def refresh_one(data):
 
     if r.status_code != 200:
         print(f"  [{data.get('email','?')}] 刷新失败: {r.status_code} {r.text[:150]}")
-        # 如果是 invalid_grant，标记禁用
+        # 如果是 invalid_grant，标记禁用（必须落盘，否则 CPA 继续轮转死 token）
         try:
             err = r.json()
             if "invalid_grant" in str(err):
                 print(f"  [{data.get('email','?')}] ⛔ 账号已被封禁，标记 disabled")
                 data["disabled"] = True
                 data["disabled_reason"] = "refresh_token_invalid"
+                with open(data["_path"], "w", encoding="utf-8") as f:
+                    json.dump({k: v for k, v in data.items() if not k.startswith("_")},
+                              f, ensure_ascii=False, indent=2)
         except Exception:
             pass
         return False

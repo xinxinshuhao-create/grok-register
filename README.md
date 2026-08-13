@@ -8,6 +8,7 @@ Automated account registration toolkit for x.ai (Grok) with SSO token extraction
 - **SSO → CPA token minting** (`sso_to_cpa.py`) — OAuth Device Flow with corrected scope, converts SSO tokens to access/refresh tokens
 - **Auto-replenish daemon** (`auto_replenish.py`) — monitors account pool, registers new accounts on demand, pushes to API gateway
 - **Token refresh daemon** (`token_daemon.py`) — keeps tokens alive
+- **OAuth token re-minting** (`remint_oauth.py`) — re-mints revoked tokens via Device Flow when xAI invalidates refresh tokens
 - **Turnstile solver** (`turnstile_solver_local.py`) — local CAPTCHA solving service
 - **Email service** (`email_service.py`) — multi-provider support (LuckMail, MailNest)
 - **Clash proxy rotator** (`clash_rotator.py`) — proxy rotation for registration
@@ -97,6 +98,16 @@ Monitors account pool every 600s, registers new accounts when pool drops below 2
 uv run python token_daemon.py
 ```
 
+### Re-mint revoked OAuth tokens
+
+When xAI invalidates refresh tokens (happens on model releases or account policy changes), re-mint them:
+
+```bash
+uv run python remint_oauth.py
+```
+
+Re-runs Device Flow with existing SSO tokens to obtain fresh access/refresh tokens.
+
 ### Start Turnstile solver
 
 ```bash
@@ -117,10 +128,12 @@ These are the models you get immediately after registration — no SuperGrok sub
 |---|---|---|
 | `grok-chat-fast` | Chat (fast mode) | SSO token → Web pool |
 | `grok-imagine-image` | Image generation | SSO token → Web pool |
-| `grok-4.5` | Chat + reasoning + search, 1M output tokens | SSO → Device Flow (`sso_to_cpa.py`) → Build pool |
-| `grok-4.6` | Chat + reasoning + search, 500K context, long-running agents | SSO → Device Flow (`sso_to_cpa.py`) → Build pool |
+| `grok-4.5` | Chat + reasoning + search, 1M output tokens | SSO → Device Flow (`sso_to_cpa.py`) → OAuth direct |
+| `grok-4.6` | Chat + reasoning + search, 500K context, long-running agents, `xhigh` reasoning | SSO → Device Flow (`sso_to_cpa.py`) → Build pool |
 
 > ✅ All four models above have been tested and confirmed working end-to-end.
+>
+> **Note**: After Grok 4.6 release, xAI removed `grok-4.5` from the Build pool — it now works via OAuth direct connection. `grok-4.6` is the current Build pool model. Use `remint_oauth.py` to re-mint tokens if xAI revokes them.
 
 ### Paid (requires SuperGrok / Heavy subscription)
 
