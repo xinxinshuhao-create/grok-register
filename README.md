@@ -118,8 +118,9 @@ These are the models you get immediately after registration — no SuperGrok sub
 | `grok-chat-fast` | Chat (fast mode) | SSO token → Web pool |
 | `grok-imagine-image` | Image generation | SSO token → Web pool |
 | `grok-4.5` | Chat + reasoning + search, 1M output tokens | SSO → Device Flow (`sso_to_cpa.py`) → Build pool |
+| `grok-4.6` | Chat + reasoning + search, 500K context, long-running agents | SSO → Device Flow (`sso_to_cpa.py`) → Build pool |
 
-> ✅ All three models above have been tested and confirmed working end-to-end.
+> ✅ All four models above have been tested and confirmed working end-to-end.
 
 ### Paid (requires SuperGrok / Heavy subscription)
 
