@@ -628,14 +628,16 @@ class GmailIMAPClient:
         self.proxies = proxies
         self.email = ""
         self._imap = None
-        self._base_email = "REDACTED"
-        self._app_password = "REDACTED"
+        self._base_email = str(os.getenv("GMAIL_BASE_EMAIL") or "").strip()
+        self._app_password = str(os.getenv("GMAIL_APP_PASSWORD") or "").strip()
         self._imap_host = "imap.gmail.com"
         self._imap_port = 993
         self._last_uid = 0  # 记录上次检查到的最新邮件 UID
 
     def _connect(self):
         import imaplib
+        if not self._base_email or not self._app_password:
+            raise RuntimeError("缺少 GMAIL_BASE_EMAIL / GMAIL_APP_PASSWORD 环境变量")
         if self._imap:
             try:
                 self._imap.noop()
