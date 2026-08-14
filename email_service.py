@@ -619,6 +619,149 @@ class GPTMailInboxV2:
         return None
 
 
+class TmailInbox:
+    """Tmail (mail.sunls.de) 免费临时邮箱 — 2026-08-14 接入
+
+    API 流程 (全部需在浏览器上下文内, 站点有 CF Turnstile 门禁):
+      1. 有头 Chrome 打开站点, Turnstile 自动通过
+      2. GET /api/domain → 域名池 (isco/sunix/chato.eu.org)
+      3. 客户端拼地址: 随机前缀@随机域名 (无 create 步骤, 地址即键)
+      4. GET /api/fetch?to={addr}&limit=30 → {code:0, data:[邮件]}
+    邮件字段: id/from/to/subject/body/created_at
+
+    ⚠️ eu.org 共享域名, 对严格风控平台 (如 xAI) 可能被拒投,
+    适合对域名不敏感的平台, 或作为免费备选源。
+    """
+
+    def __init__(self, proxies: Any = None):
+        self.base_url = "https://mail.sunls.de"
+        self.proxies = proxies
+        self.email = ""
+        self._page = None
+        self._browser = None
+        self._pw = None
+        self._loop = None
+        self._loop_thread = None
+        self._domains = []
+
+    def _ensure_loop(self):
+        import asyncio
+        if self._loop is None or self._loop.is_closed():
+            self._loop = asyncio.new_event_loop()
+            self._loop_thread = threading.Thread(target=self._loop.run_forever, daemon=True)
+            self._loop_thread.start()
+        return self._loop
+
+    def _run(self, coro, timeout=90):
+        import asyncio
+        fut = asyncio.run_coroutine_threadsafe(coro, self._ensure_loop())
+        return fut.result(timeout=timeout)
+
+    def _get_page(self):
+        if self._page is not None:
+            return self._page
+        from patchright.async_api import async_playwright
+        import asyncio as _asyncio
+
+        async def _launch():
+            self._pw = await async_playwright().start()
+            # ⚠️ 必须 headless=False: Turnstile 在无头浏览器里过不了
+            browser = await self._pw.chromium.launch(headless=False, channel="chrome",
+                args=["--disable-blink-features=AutomationControlled"])
+            ctx = await browser.new_context(viewport={"width": 1000, "height": 700})
+            page = await ctx.new_page()
+            await page.goto(f"{self.base_url}/", timeout=40000, wait_until="domcontentloaded")
+            # 等 Turnstile 通过: 前端验证完成后会写入 localStorage.address
+            for _ in range(45):
+                await _asyncio.sleep(1)
+                addr = await page.evaluate("localStorage.getItem('address')")
+                if addr:
+                    self._browser = browser
+                    self._page = page
+                    return page
+            raise RuntimeError("Turnstile 验证超时未通过")
+
+        try:
+            return self._run(_launch(), timeout=120)
+        except Exception as e:
+            raise RuntimeError(f"Tmail 浏览器会话启动失败: {e}") from e
+
+    def close(self):
+        async def _close():
+            if self._browser is not None:
+                try:
+                    await self._browser.close()
+                except Exception:
+                    pass
+            if self._pw is not None:
+                try:
+                    await self._pw.stop()
+                except Exception:
+                    pass
+
+        if self._loop is not None and not self._loop.is_closed():
+            try:
+                self._run(_close(), timeout=30)
+            except Exception:
+                pass
+            try:
+                self._loop.call_soon_threadsafe(self._loop.stop)
+            except Exception:
+                pass
+        self._browser = None
+        self._page = None
+        self._pw = None
+
+    def create_email(self):
+        """浏览器内拿域名池 + 随机拼地址, 返回 (token_like, email)。"""
+        self._get_page()
+        js = """
+        async () => {
+            const dr = await fetch("/api/domain");
+            const dj = await dr.json();
+            if (dj.code !== 0 || !(dj.data || []).length) return {err: "no domains"};
+            const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+            let prefix = "";
+            for (let i = 0; i < 10; i++) prefix += chars[Math.floor(Math.random() * 36)];
+            const email = prefix + "@" + dj.data[Math.floor(Math.random() * dj.data.length)];
+            return {email};
+        }
+        """
+        try:
+            result = self._run(self._page.evaluate(js), timeout=60)
+        except Exception as e:
+            raise RuntimeError(f"Tmail 创建邮箱失败: {e}") from e
+        if not isinstance(result, dict) or result.get("err") or not result.get("email"):
+            raise RuntimeError(f"Tmail 创建邮箱失败: {result}")
+        self.email = str(result["email"])
+        return {"provider": "tmail", "token": self.email, "email": self.email, "client": self}, self.email
+
+    def fetch_first_email(self) -> Optional[str]:
+        """轮询 /api/fetch?to={addr}&limit=30, 返回邮件文本 (subject+body)。"""
+        if not self.email or self._page is None:
+            return None
+        js = """
+        async (email) => {
+            const r = await fetch("/api/fetch?to=" + encodeURIComponent(email) + "&limit=30");
+            const j = await r.json();
+            if (j.code !== 0 || !(j.data || []).length) return null;
+            const parts = [];
+            for (const m of j.data) {
+                if (m.subject) parts.push(m.subject);
+                if (m.body) parts.push(String(m.body).slice(0, 2000));
+            }
+            return parts.join("\\n");
+        }
+        """
+        try:
+            result = self._run(self._page.evaluate(js, self.email), timeout=60)
+        except Exception:
+            return None
+        if not result:
+            return None
+        return str(result)
+
+
 class GmailIMAPClient:
     """Gmail IMAP 客户端 — 用 +alias 无限衍生邮箱，IMAP 轮询收验证码"""
 
@@ -700,7 +843,7 @@ class EmailService:
     def __init__(self, proxies: Any = None, provider: str = "luckmail"):
         self.proxies = proxies
         self.provider = str(provider or os.getenv("EMAIL_PROVIDER") or "luckmail").strip().lower()
-        if self.provider not in {"gptmail", "mailtm", "luckmail", "mailnest", "gmail"}:
+        if self.provider not in {"gptmail", "mailtm", "luckmail", "mailnest", "gmail", "tmail"}:
             raise ValueError(f"不支持的邮箱提供商: {self.provider}")
 
     def create_email(self):
@@ -755,6 +898,15 @@ class EmailService:
             except Exception as e:
                 print(f"[Error] Gmail 出错: {e}")
                 return None, None
+        elif self.provider == "tmail":
+            try:
+                client = TmailInbox(self.proxies)
+                token_like, email = client.create_email()
+                print(f"[+] Tmail 邮箱已创建: {email}")
+                return token_like, email
+            except Exception as e:
+                print(f"[Error] 请求 Tmail 出错: {e}")
+                return None, None
         # gptmail: 使用 V2 API
         try:
             client = GPTMailInboxV2(self.proxies)
@@ -776,7 +928,7 @@ class EmailService:
             if not client:
                 return None
 
-            if provider in ("mailtm", "luckmail", "gptmail-v2", "gmail"):
+            if provider in ("mailtm", "luckmail", "gptmail-v2", "gmail", "tmail"):
                 return client.fetch_first_email()
             elif provider == "mailnest":
                 return client.fetch_first_email(token_like.get("email"))

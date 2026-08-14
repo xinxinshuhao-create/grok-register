@@ -249,7 +249,7 @@ def register_single_thread(email_provider: str = "gptmail"):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--email-provider", choices=["gptmail", "luckmail", "mailtm", "gmail"], default=os.getenv("EMAIL_PROVIDER", "luckmail"), help="邮箱提供商：gptmail/luckmail/mailtm")
+    parser.add_argument("--email-provider", choices=["gptmail", "luckmail", "mailtm", "gmail", "tmail"], default=os.getenv("EMAIL_PROVIDER", "luckmail"), help="邮箱提供商：gptmail/luckmail/mailtm/gmail/tmail")
     parser.add_argument("--threads", type=int, default=None, help="并发线程数")
     parser.add_argument("--count", type=int, default=0, help="总注册数量（0=无限）")
     args = parser.parse_args()
