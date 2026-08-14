@@ -161,7 +161,9 @@ async def solve_turnstile(site_url: str, site_key: str,
 
 # ═══════════════════════ HTTP 服务（可选） ═══════════════════════
 
-def run_server(port=8088, secret="grok-solver"):
+def run_server(port=8088, secret=None):
+    if secret is None:
+        secret = os.getenv("SOLVER_SECRET") or "grok-solver"
     """启动简单的 HTTP API 服务"""
     from http.server import HTTPServer, BaseHTTPRequestHandler
 
