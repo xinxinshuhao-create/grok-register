@@ -762,6 +762,81 @@ class TmailInbox:
         return str(result)
 
 
+class FCEInbox:
+    """FreeCustom.Email 免费临时邮箱 — 2026-08-14 接入
+
+    纯 REST API, 无浏览器依赖:
+      1. POST /v1/inboxes {"inbox": "前缀@域名"} → 注册地址
+      2. GET  /v1/inboxes/{inbox}/messages → {success, data:[...], count}
+    环境变量: FCE_API_KEY (必填), FCE_BASE_URL (默认 https://api2.freecustom.email/v1)
+    域名池: ditapi.info / ditmail.info / fce.email
+    免费套餐注意: isTesting=true 需付费; OTP 端点免费档只返回 __DETECTED__,
+    取码走 messages 端点自行正则提取。共享平台域名, 严格风控平台 (如 xAI)
+    可能拒投, 适合对域名不敏感的平台。
+    """
+
+    DOMAINS = ["ditapi.info", "fce.email"]  # ditmail.info 免费档不支持 (403)
+
+    def __init__(self, proxies: Any = None):
+        self.proxies = proxies
+        self.base_url = str(os.getenv("FCE_BASE_URL") or "https://api2.freecustom.email/v1").strip().rstrip("/")
+        self.api_key = str(os.getenv("FCE_API_KEY") or "").strip()
+        self.email = ""
+        self._session = None
+
+    def _get_session(self):
+        if self._session is None:
+            import requests as _requests
+            self._session = _requests.Session()
+            if self.proxies:
+                self._session.proxies.update(self.proxies)
+        return self._session
+
+    def create_email(self):
+        if not self.api_key:
+            raise RuntimeError("缺少 FCE_API_KEY 环境变量 (freecustom.email 免费注册获取)")
+        prefix = "".join(random.choices(_string.ascii_lowercase + _string.digits, k=10))
+        self.email = f"{prefix}@{random.choice(self.DOMAINS)}"
+        r = self._get_session().post(
+            f"{self.base_url}/inboxes",
+            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+            json={"inbox": self.email},
+            timeout=20,
+        )
+        data = r.json() if r.status_code < 500 else {}
+        if r.status_code not in (200, 201) or not data.get("success"):
+            raise RuntimeError(f"FCE 注册邮箱失败: HTTP {r.status_code} {str(data)[:150]}")
+        return {"provider": "fce", "token": self.email, "email": self.email, "client": self}, self.email
+
+    def fetch_first_email(self) -> Optional[str]:
+        if not self.email:
+            return None
+        try:
+            r = self._get_session().get(
+                f"{self.base_url}/inboxes/{urllib.parse.quote(self.email)}/messages",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                timeout=20,
+            )
+            if r.status_code != 200:
+                return None
+            data = r.json()
+            msgs = data.get("data") or []
+            if not msgs:
+                return None
+            parts = []
+            for m in msgs:
+                subject = str(m.get("subject") or "")
+                body = str(m.get("body") or m.get("text") or m.get("html") or "")
+                if subject:
+                    parts.append(subject)
+                if body:
+                    parts.append(body[:2000])
+            text = "\n".join(parts)
+            return text if len(text) > 5 else None
+        except Exception:
+            return None
+
+
 class GmailIMAPClient:
     """Gmail IMAP 客户端 — 用 +alias 无限衍生邮箱，IMAP 轮询收验证码"""
 
@@ -843,7 +918,7 @@ class EmailService:
     def __init__(self, proxies: Any = None, provider: str = "luckmail"):
         self.proxies = proxies
         self.provider = str(provider or os.getenv("EMAIL_PROVIDER") or "luckmail").strip().lower()
-        if self.provider not in {"gptmail", "mailtm", "luckmail", "mailnest", "gmail", "tmail"}:
+        if self.provider not in {"gptmail", "mailtm", "luckmail", "mailnest", "gmail", "tmail", "fce"}:
             raise ValueError(f"不支持的邮箱提供商: {self.provider}")
 
     def create_email(self):
@@ -907,6 +982,15 @@ class EmailService:
             except Exception as e:
                 print(f"[Error] 请求 Tmail 出错: {e}")
                 return None, None
+        elif self.provider == "fce":
+            try:
+                client = FCEInbox(self.proxies)
+                token_like, email = client.create_email()
+                print(f"[+] FCE 邮箱已创建: {email}")
+                return token_like, email
+            except Exception as e:
+                print(f"[Error] 请求 FCE 出错: {e}")
+                return None, None
         # gptmail: 使用 V2 API
         try:
             client = GPTMailInboxV2(self.proxies)
@@ -928,7 +1012,7 @@ class EmailService:
             if not client:
                 return None
 
-            if provider in ("mailtm", "luckmail", "gptmail-v2", "gmail", "tmail"):
+            if provider in ("mailtm", "luckmail", "gptmail-v2", "gmail", "tmail", "fce"):
                 return client.fetch_first_email()
             elif provider == "mailnest":
                 return client.fetch_first_email(token_like.get("email"))
