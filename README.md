@@ -15,7 +15,7 @@ Automated account registration toolkit for x.ai (Grok) with SSO token extraction
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.12+
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 - [YesCaptcha](https://yescaptcha.com/) API key (for Turnstile solving)
 - Email provider account (LuckMail / MailNest)
@@ -49,7 +49,7 @@ Copy `.env.example` to `.env` and fill in:
 | Variable | Required | Description |
 |---|---|---|
 | `YESCAPTCHA_KEY` | Yes | YesCaptcha API key for Turnstile solving |
-| `EMAIL_PROVIDER` | No | Email provider: `luckmail` / `mailnest` / `gptmail` (default: `gptmail`) |
+| `EMAIL_PROVIDER` | No | Email provider: `luckmail` / `mailnest` / `gptmail` (default: `luckmail`) |
 | `LUCKMAIL_API_KEY` | If luckmail | LuckMail API key |
 | `LUCKMAIL_PROJECT_CODE` | No | LuckMail project code (default: `grok`) |
 | `LUCKMAIL_EMAIL_TYPE` | No | Email type (default: `ms_imap`) |

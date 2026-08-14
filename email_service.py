@@ -583,9 +583,9 @@ class GmailIMAPClient:
 class EmailService:
     """统一邮箱服务门面，兼容旧调用方"""
 
-    def __init__(self, proxies: Any = None, provider: str = "gptmail"):
+    def __init__(self, proxies: Any = None, provider: str = "luckmail"):
         self.proxies = proxies
-        self.provider = str(provider or os.getenv("EMAIL_PROVIDER") or "gptmail").strip().lower()
+        self.provider = str(provider or os.getenv("EMAIL_PROVIDER") or "luckmail").strip().lower()
         if self.provider not in {"gptmail", "mailtm", "luckmail", "mailnest", "gmail"}:
             raise ValueError(f"不支持的邮箱提供商: {self.provider}")
 

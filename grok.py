@@ -38,7 +38,7 @@ success_count = 0
 completed_count = 0
 target_count = 0  # 0 = 无限
 start_time = time.time()
-EMAIL_PROVIDER = str(os.getenv("EMAIL_PROVIDER") or "gptmail").strip().lower()
+EMAIL_PROVIDER = str(os.getenv("EMAIL_PROVIDER") or "luckmail").strip().lower()
 
 def generate_random_name() -> str:
     length = random.randint(4, 6)
@@ -248,7 +248,7 @@ def register_single_thread(email_provider: str = "gptmail"):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--email-provider", choices=["gptmail", "luckmail", "mailtm", "gmail"], default=os.getenv("EMAIL_PROVIDER", "gptmail"), help="邮箱提供商：gptmail/luckmail/mailtm")
+    parser.add_argument("--email-provider", choices=["gptmail", "luckmail", "mailtm", "gmail"], default=os.getenv("EMAIL_PROVIDER", "luckmail"), help="邮箱提供商：gptmail/luckmail/mailtm")
     parser.add_argument("--threads", type=int, default=None, help="并发线程数")
     parser.add_argument("--count", type=int, default=0, help="总注册数量（0=无限）")
     args = parser.parse_args()
@@ -275,7 +275,8 @@ def main():
             # Action ID — 并发抓取所有 JS 文件（用标准 requests，线程安全+快速）
             js_urls = list(set(urljoin(start_url, m.group(0)) for m in re.finditer(r"/_next/static/chunks/[^\"'\s>]+\.js", html)))
             if not js_urls:
-                print(f"[Warn] HTML 长度 {len(html)}, 未解析出 JS，前500字符预览: {html[:500].replace('\n',' ')}")
+                preview = html[:500].replace("\n", " ")
+                print(f"[Warn] HTML 长度 {len(html)}, 未解析出 JS，前500字符预览: {preview}")
             action_found = None
             print(f"[*] 并发搜索 {len(js_urls)} 个 JS 文件中的 Action ID...")
 
