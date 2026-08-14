@@ -69,10 +69,26 @@ Copy `.env.example` to `.env` and fill in:
 | `fce` | Free | Platform domains: `@ditapi.info`, `@fce.email` | No | Pure REST API; set `FCE_API_KEY`. **Gmail/Outlook addresses are NOT accepted as inboxes; custom domains require paid plans ($29/mo+)**. Free tier has rate limits; OTP endpoint returns `__DETECTED__` on free tier — codes are parsed from messages instead |
 | `tmail` | Free | Shared eu.org domains | Yes | Anonymous, no key |
 | `gptmail` | Free | Shared disposable domains | Yes | xAI does not deliver codes to these domains (use for other platforms) |
+| `outlook` | Free | Your own Outlook/Hotmail (+tag alias) | No | High trust (personal domain). Set `OUTLOOK_ACCOUNTS` + `OUTLOOK_TOKENS_FILE`; requires one-time Microsoft OAuth authorization per account (see below) |
 | `mailnest` | Paid | Outlook-based | No | Set `MAILNEST_API_KEY` + `MAILNEST_PROJECT_CODE` |
 
 > ⚠️ xAI actively blocks shared disposable-mail domains (mail.tm, gptmail domains). For Grok
-> registration prefer `luckmail` (Outlook addresses) or `gmail` (your own domain).
+> registration prefer `luckmail` (Outlook addresses) or `gmail`/`outlook` (your own accounts).
+> **Maintainer's production setup uses `luckmail`.** The free providers above are provided as
+> options for other users; their availability may change without notice.
+
+### Outlook provider authorization (one-time per account)
+
+The `outlook` provider reads codes via Microsoft OAuth (XOAUTH2 IMAP). Authorize each account once:
+
+```bash
+# uses the same authorization flow as unified-mail's graph_auth.py
+uv run python outlook_auth.py your@outlook.com
+```
+
+The resulting refresh token is stored in `OUTLOOK_TOKENS_FILE` (default `./outlook_tokens.json`),
+format: `{"your@outlook.com": {"refresh_token": "..."}}`. Only accounts with a valid refresh
+token are used for registration.
 
 ## Usage
 
@@ -183,3 +199,21 @@ This project builds upon and references work from:
 ## License
 
 MIT
+
+## ⚠️ Disclaimer / 免责声明
+
+**本工具仅用于教育和技术研究目的。使用者须自行承担全部责任。**
+
+- 本项目提供的账号注册与临时邮箱方案**可能违反相关平台的《服务条款》**（包括但不限于 xAI/Grok、Google、Microsoft 等），平台有权随时封禁账号、撤销凭据或追究责任。
+- **在部分国家和地区，批量注册账号、使用临时邮箱、绕过验证机制等行为可能违反当地法律法规**。使用者有责任确认并遵守所在地法律，本项目作者不承担任何因使用本工具导致的直接或间接后果（包括但不限于账号损失、法律纠纷、经济损失）。
+- 项目内各邮箱服务（LuckMail、FreeCustom.Email、Tmail、GPTMail 等）为第三方服务，其可用性、价格与合规性以其官方为准；本仓库不对第三方服务的任何行为负责。
+- 示例中出现的账号、令牌均为占位或已撤销；请勿将任何真实凭据提交到本仓库或任何公开位置。
+- 使用本仓库代码即表示你已阅读并同意上述条款。
+
+**This project is for educational and research purposes only. Users assume all responsibility.**
+
+- Account registration and temporary-email tooling may **violate the Terms of Service of the target platforms** (xAI/Grok, Google, Microsoft, etc.). Platforms may ban accounts, revoke credentials, or pursue other actions at any time.
+- **In some jurisdictions, bulk account registration, disposable-email usage, or bypassing verification mechanisms may be illegal.** You are solely responsible for ensuring compliance with your local laws and regulations. The authors accept no liability for any direct or indirect consequences (including account loss, legal disputes, or financial damages).
+- All third-party email services (LuckMail, FreeCustom.Email, Tmail, GPTMail, etc.) are provided by their respective operators. Availability, pricing, and compliance are subject to their official terms; this repository is not responsible for their actions.
+- Sample accounts and tokens shown in this repository are placeholders or revoked. Never commit real credentials here or anywhere public.
+- By using this code, you confirm that you have read and agree to the above.

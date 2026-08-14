@@ -24,3 +24,4 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+outlook_tokens.json

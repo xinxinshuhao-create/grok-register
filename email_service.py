@@ -837,6 +837,147 @@ class FCEInbox:
             return None
 
 
+class OutlookInbox:
+    """Outlook +tag 别名邮箱 — XOAUTH2 IMAP 直读 (2026-08-14 接入, 移植自 unified-mail)
+
+    域名信任度与 Gmail 同档 (个人域名, xAI 不屏蔽)。定位: GitHub 用户自选的
+    免费高信任度方案; 本仓库维护者生产环境使用 luckmail。
+
+    配置 (env):
+      OUTLOOK_ACCOUNTS     逗号分隔基础账号, 如 "a@outlook.com,b@hotmail.com"
+      OUTLOOK_TOKENS_FILE  refresh token 文件路径 (默认 ./outlook_tokens.json)
+                           格式 {"account": {"refresh_token": "..."}}
+    授权: 每账号跑一次 Microsoft OAuth 授权 (见 README 的 graph_auth 说明)
+    """
+
+    MS_CLIENT_ID = "9e5f94bc-e8a4-4e73-b8be-63364c29d753"
+    MS_SCOPE = "offline_access openid email https://outlook.office.com/IMAP.AccessAsUser.All"
+    MS_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+    IMAP_HOST = "outlook.office365.com"
+
+    def __init__(self, proxies: Any = None):
+        self.proxies = proxies
+        self.accounts = [a.strip() for a in
+                         str(os.getenv("OUTLOOK_ACCOUNTS") or "").split(",") if a.strip()]
+        self.tokens_file = str(os.getenv("OUTLOOK_TOKENS_FILE") or "outlook_tokens.json").strip()
+        self.email = ""
+        self._base = ""
+        self._tokens: Dict[str, dict] = {}
+        self._access: Dict[str, tuple] = {}
+        self._last_uid = 0
+
+    def _load_tokens(self):
+        try:
+            with open(self.tokens_file, encoding="utf-8") as f:
+                data = json.load(f)
+            self._tokens = data if isinstance(data, dict) else {}
+        except Exception:
+            self._tokens = {}
+
+    def _get_access(self, account: str) -> str:
+        import time as _time
+        now = _time.time()
+        cached = self._access.get(account)
+        if cached and cached[1] - now > 300:
+            return cached[0]
+        self._load_tokens()
+        rt = (self._tokens.get(account) or {}).get("refresh_token", "")
+        if not rt:
+            raise RuntimeError(f"Outlook: 账号 {account} 无 refresh token, 需先完成 OAuth 授权")
+        import urllib.request, urllib.parse
+        form = urllib.parse.urlencode({
+            "client_id": self.MS_CLIENT_ID,
+            "scope": self.MS_SCOPE,
+            "refresh_token": rt,
+            "grant_type": "refresh_token",
+        }).encode()
+        req = urllib.request.Request(self.MS_TOKEN_URL, data=form)
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+        at = data.get("access_token")
+        if not at:
+            raise RuntimeError(f"Outlook: token 刷新失败 {account}: {str(data)[:120]}")
+        self._access[account] = (at, now + int(data.get("expires_in", 3600)))
+        return at
+
+    def _connect(self, account: str):
+        import imaplib, ssl as _ssl
+        at = self._get_access(account)
+        conn = imaplib.IMAP4_SSL(self.IMAP_HOST, 993, ssl_context=_ssl.create_default_context())
+        conn.socket().settimeout(15)
+        auth = f"user={account}\x01auth=Bearer {at}\x01\x01"
+        conn.authenticate("XOAUTH2", lambda _: auth.encode())
+        return conn
+
+    def create_email(self):
+        if not self.accounts:
+            raise RuntimeError("缺少 OUTLOOK_ACCOUNTS 环境变量")
+        self._load_tokens()
+        # 有 refresh token 的账号权重 3, 无 token 的权重 1 (需要转发兜底, 本实现仅支持有 token 的直读)
+        candidates = []
+        for acc in self.accounts:
+            candidates.extend([acc] * (3 if acc in self._tokens else 0))
+        if not candidates:
+            raise RuntimeError("Outlook: 所有账号均无 refresh token, 先完成 OAuth 授权")
+        self._base = random.choice(candidates)
+        tag = "".join(random.choice(_string.ascii_lowercase + _string.digits) for _ in range(8))
+        user, domain = self._base.split("@", 1)
+        self.email = f"{user}+grok{tag}@{domain}"
+        # 基线 UID
+        try:
+            conn = self._connect(self._base)
+            conn.select("INBOX")
+            _, data = conn.uid("SEARCH", None, "ALL")
+            uids = data[0].split()
+            self._last_uid = int(uids[-1]) if uids else 0
+            conn.logout()
+        except Exception:
+            self._last_uid = 0
+        return {"provider": "outlook", "token": self.email, "email": self.email, "client": self}, self.email
+
+    def fetch_first_email(self) -> Optional[str]:
+        if not self.email:
+            return None
+        try:
+            conn = self._connect(self._base)
+            conn.select("INBOX")
+            _, data = conn.uid("SEARCH", None,
+                               f"UID {self._last_uid + 1}:*" if self._last_uid else "ALL")
+            uids = [u for u in data[0].split() if u]
+            if not uids:
+                conn.logout()
+                return None
+            import email as _email_mod
+            texts = []
+            for uid in uids[-3:]:  # 只读最近 3 封
+                _, msg_data = conn.uid("FETCH", uid, "(BODY.PEEK[] )")
+                raw = b"\r\n".join(p for p in msg_data[0] if isinstance(p, bytes))
+                msg = _email_mod.message_from_bytes(raw)
+                subj = str(msg.get("Subject") or "")
+                body = ""
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        if part.get_content_type() == "text/plain":
+                            try:
+                                body = part.get_payload(decode=True).decode("utf-8", "replace")
+                            except Exception:
+                                pass
+                            break
+                else:
+                    try:
+                        body = msg.get_payload(decode=True).decode("utf-8", "replace")
+                    except Exception:
+                        body = ""
+                texts.append(subj + " " + body[:1500])
+            self._last_uid = int(uids[-1])
+            conn.logout()
+            text = "\n".join(texts)
+            return text if len(text) > 5 else None
+        except Exception:
+            return None
+
+
 class GmailIMAPClient:
     """Gmail IMAP 客户端 — 用 +alias 无限衍生邮箱，IMAP 轮询收验证码"""
 
@@ -918,7 +1059,7 @@ class EmailService:
     def __init__(self, proxies: Any = None, provider: str = "luckmail"):
         self.proxies = proxies
         self.provider = str(provider or os.getenv("EMAIL_PROVIDER") or "luckmail").strip().lower()
-        if self.provider not in {"gptmail", "mailtm", "luckmail", "mailnest", "gmail", "tmail", "fce"}:
+        if self.provider not in {"gptmail", "mailtm", "luckmail", "mailnest", "gmail", "tmail", "fce", "outlook"}:
             raise ValueError(f"不支持的邮箱提供商: {self.provider}")
 
     def create_email(self):
@@ -991,6 +1132,15 @@ class EmailService:
             except Exception as e:
                 print(f"[Error] 请求 FCE 出错: {e}")
                 return None, None
+        elif self.provider == "outlook":
+            try:
+                client = OutlookInbox(self.proxies)
+                token_like, email = client.create_email()
+                print(f"[+] Outlook 别名已创建: {email}")
+                return token_like, email
+            except Exception as e:
+                print(f"[Error] 请求 Outlook 出错: {e}")
+                return None, None
         # gptmail: 使用 V2 API
         try:
             client = GPTMailInboxV2(self.proxies)
@@ -1012,7 +1162,7 @@ class EmailService:
             if not client:
                 return None
 
-            if provider in ("mailtm", "luckmail", "gptmail-v2", "gmail", "tmail", "fce"):
+            if provider in ("mailtm", "luckmail", "gptmail-v2", "gmail", "tmail", "fce", "outlook"):
                 return client.fetch_first_email()
             elif provider == "mailnest":
                 return client.fetch_first_email(token_like.get("email"))
