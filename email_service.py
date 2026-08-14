@@ -16,6 +16,7 @@ import os
 import re
 import random
 import string as _string
+import threading
 import urllib.parse
 from typing import Any, Dict, List, Optional
 
@@ -403,6 +404,11 @@ class GPTMailInboxV2:
       3. POST /api/inbox-token     → 注册邮箱，获取 JWT token
       4. GET  /api/emails?email=.. → 轮询邮件
       5. GET  /api/email/{id}      → 获取邮件详情
+
+    2026-08-14 修复: /api/inbox-token 增加 CF Turnstile 浏览器验证
+    (428 browser_verification_required), 纯 requests 调用被拒。
+    实测必须用有头 Chrome (headless 无法过挑战), 在页面上下文 fetch 同源
+    API 即 200。收信轮询无需浏览器验证, 用 requests + x-inbox-token 即可。
     """
 
     def __init__(self, proxies: Any = None):
@@ -417,12 +423,94 @@ class GPTMailInboxV2:
         self.email = ""
         self.token = ""
         self._domains = []
+        self._page = None
+        self._browser = None
+        self._pw = None
+        self._loop = None
+        self._loop_thread = None
 
     def _warmup(self):
         try:
             self.session.get(f"{self.base_url}/", timeout=10)
         except Exception:
             pass
+
+    def _ensure_loop(self):
+        """patchright 异步对象绑定创建时的 event loop, 必须用常驻线程 loop。"""
+        import asyncio
+        if self._loop is None or self._loop.is_closed():
+            self._loop = asyncio.new_event_loop()
+            self._loop_thread = threading.Thread(target=self._loop.run_forever, daemon=True)
+            self._loop_thread.start()
+        return self._loop
+
+    def _run(self, coro, timeout=90):
+        import asyncio
+        loop = self._ensure_loop()
+        fut = asyncio.run_coroutine_threadsafe(coro, loop)
+        return fut.result(timeout=timeout)
+
+    def _get_page(self):
+        """启动无头 Chrome 打开站点, CF Turnstile 自动通过后 page 常驻复用。"""
+        if self._page is not None:
+            return self._page
+        from patchright.async_api import async_playwright
+
+        async def _launch():
+            self._pw = await async_playwright().start()
+            # ⚠️ 必须 headless=False: CF Turnstile 在无头浏览器里过不了 (实测 428)
+            browser = await self._pw.chromium.launch(headless=False, channel="chrome",
+                args=["--disable-blink-features=AutomationControlled"])
+            ctx = await browser.new_context(viewport={"width": 1000, "height": 700})
+            page = await ctx.new_page()
+            # 挑战通过后前端会自动创建邮箱, URL 跳到 /zh/{email}; 以此作为通过信号
+            passed = False
+            for attempt in range(2):
+                await page.goto(f"{self.base_url}/", timeout=40000, wait_until="domcontentloaded")
+                for _ in range(25):
+                    await _asyncio.sleep(1)
+                    if "/zh/" in page.url and "@" in page.url:
+                        passed = True
+                        break
+                if passed:
+                    break
+            if not passed:
+                raise RuntimeError("CF 挑战未通过 (可能被限流, 稍后重试)")
+            self._browser = browser
+            self._page = page
+            return page
+
+        import asyncio as _asyncio
+        try:
+            return self._run(_launch())
+        except Exception as e:
+            raise RuntimeError(f"GPTMail 浏览器会话启动失败: {e}") from e
+
+    def close(self):
+        async def _close():
+            if self._browser is not None:
+                try:
+                    await self._browser.close()
+                except Exception:
+                    pass
+            if self._pw is not None:
+                try:
+                    await self._pw.stop()
+                except Exception:
+                    pass
+
+        if self._loop is not None and not self._loop.is_closed():
+            try:
+                self._run(_close(), timeout=30)
+            except Exception:
+                pass
+            try:
+                self._loop.call_soon_threadsafe(self._loop.stop)
+            except Exception:
+                pass
+        self._browser = None
+        self._page = None
+        self._pw = None
 
     def _get_domains(self):
         if self._domains:
@@ -439,24 +527,48 @@ class GPTMailInboxV2:
         return self._domains
 
     def create_email(self) -> str:
-        domains = self._get_domains()
-        prefix = "".join(random.choices(_string.ascii_lowercase + _string.digits, k=10))
-        domain = random.choice(domains)
-        self.email = f"{prefix}@{domain}"
-
-        r = self.session.post(
-            f"{self.base_url}/api/inbox-token",
-            headers={"Content-Type": "application/json"},
-            json={"email": self.email},
-            timeout=15,
-        )
-        if r.status_code != 200:
-            raise RuntimeError(f"inbox-token 失败: {r.status_code}")
-        data = r.json()
-        if not data.get("success"):
-            raise RuntimeError(f"inbox-token 返回失败: {data}")
-        self.token = (data.get("auth") or {}).get("token") or ""
-        if not self.token:
+        """在浏览器上下文里调 inbox-token (过 CF 验证), 返回邮箱地址。"""
+        import time as _time
+        self._get_page()
+        js = """
+        async () => {
+            const dr = await fetch("/api/domains/public");
+            const dj = await dr.json();
+            const domains = ((dj.data || {}).domains || [])
+                .filter(d => d.is_active).map(d => d.domain_name);
+            if (!domains.length) return {err: "no active domains"};
+            const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+            let prefix = "";
+            for (let i = 0; i < 10; i++) prefix += chars[Math.floor(Math.random() * 36)];
+            const email = prefix + "@" + domains[Math.floor(Math.random() * domains.length)];
+            const r = await fetch("/api/inbox-token", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({email}),
+            });
+            const j = await r.json();
+            if (r.status !== 200 || !j.success) {
+                return {err: "inbox-token failed: " + r.status + " " + JSON.stringify(j)};
+            }
+            return {email, token: (j.auth || {}).token || ""};
+        }
+        """
+        # 挑战通过有延迟, 428 时重试 (最多 4 次, 每次等 6s)
+        result = None
+        for attempt in range(4):
+            try:
+                result = self._run(self._page.evaluate(js), timeout=60)
+            except Exception as e:
+                raise RuntimeError(f"GPTMail inbox-token 浏览器调用失败: {e}") from e
+            if isinstance(result, dict) and not result.get("err"):
+                break
+            if attempt < 3:
+                _time.sleep(6)
+        if not isinstance(result, dict) or result.get("err"):
+            raise RuntimeError(f"inbox-token 失败: {result}")
+        self.email = str(result.get("email") or "")
+        self.token = str(result.get("token") or "")
+        if not self.email or not self.token:
             raise RuntimeError("未获取到 inbox token")
         return self.email
 
