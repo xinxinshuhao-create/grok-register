@@ -23,7 +23,7 @@ def _utc_to_ts(utc_str):
     except (ValueError, OverflowError):
         return None
 
-AUTH_DIR = r"D:\CLIProxyAPIPlus\auths"
+AUTH_DIR = os.getenv("CPA_AUTHS_DIR") or r"D:\CLIProxyAPIPlus\auths"
 CLIENT_ID = "b1a00492-073a-47ea-816f-4c329264a828"
 PROXY = os.getenv("GROK_PROXY") or "http://127.0.0.1:7897"
 TOKEN_ENDPOINT = "https://auth.x.ai/oauth2/token"

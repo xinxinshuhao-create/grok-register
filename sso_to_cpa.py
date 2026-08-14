@@ -14,7 +14,7 @@ TOKEN_ENDPOINT = "https://auth.x.ai/oauth2/token"
 AUTHORIZE_URL = "https://auth.x.ai/oauth2/authorize"
 SCOPE = "openid profile email offline_access grok-cli:access api:access"
 PROXY = os.getenv("GROK_PROXY") or "http://127.0.0.1:7897"
-AUTH_DIR = "D:/CLIProxyAPIPlus/auths"
+AUTH_DIR = os.getenv("CPA_AUTHS_DIR") or "D:/CLIProxyAPIPlus/auths"
 KEYS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "keys")
 
 

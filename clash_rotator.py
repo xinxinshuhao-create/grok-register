@@ -19,10 +19,10 @@ import json, time, random, urllib.request, urllib.error, sys, os
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-CLASH_HOST = "127.0.0.1"
-CLASH_PORT = 9097
-CLASH_SECRET = "set-your-secret"
-PROXY_GROUP = "落云"  # 订阅代理组名
+CLASH_HOST = os.getenv("CLASH_HOST") or "127.0.0.1"
+CLASH_PORT = int(os.getenv("CLASH_PORT") or 9097)
+CLASH_SECRET = os.getenv("CLASH_SECRET") or ""
+PROXY_GROUP = os.getenv("CLASH_PROXY_GROUP") or "落云"  # 订阅代理组名
 BASE_URL = f"http://{CLASH_HOST}:{CLASH_PORT}"
 
 # 日常使用的稳定节点 —— 轮换时排除此节点，注册完成后切回

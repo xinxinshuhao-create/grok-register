@@ -27,7 +27,7 @@ def _utc_to_ts(utc_str):
         return None
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-AUTH_DIR = r"D:\CLIProxyAPIPlus\auths"
+AUTH_DIR = os.getenv("CPA_AUTHS_DIR") or r"D:\CLIProxyAPIPlus\auths"
 PROXY = os.getenv("GROK_PROXY") or "http://127.0.0.1:7897"
 GROK2API_BASE = os.getenv("GROK2API_BASE") or "http://127.0.0.1:8000"
 GROK2API_USER = os.getenv("GROK2API_USER") or "admin"

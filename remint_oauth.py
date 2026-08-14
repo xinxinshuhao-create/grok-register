@@ -7,12 +7,7 @@ os.environ.setdefault("GROK_PROXY", "http://127.0.0.1:7891")  # nexitally 干净
 from device_mint import sso_to_device
 from sso_to_cpa import save_auth
 
-NEED = [
-    "9motusij1h@aws-mail-free-9283.dynv6.net",
-    "b8r5yfskag@martenson-mail.mywire.org",
-    "v3cj4uvcoh@msn-mail-free-1268.dynv6.net",
-    "y1ys3nvcbn@njwzzvmtin.my",
-]
+NEED = [e.strip() for e in os.getenv("REMINT_EMAILS", "").split(",") if e.strip()]
 
 # 从 accounts.txt 读 SSO (带 BOM)
 sso_map = {}

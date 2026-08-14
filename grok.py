@@ -18,9 +18,10 @@ from YesCaptcha_service import TurnstileService
 # 基础配置
 site_url = "https://accounts.x.ai"
 user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
+_proxy_url = os.getenv("GROK_PROXY") or "http://127.0.0.1:7897"
 PROXIES = {
-    "http": "http://127.0.0.1:7897",
-    "https": "http://127.0.0.1:7897"
+    "http": _proxy_url,
+    "https": _proxy_url
 }
 
 # 动态获取的全局变量

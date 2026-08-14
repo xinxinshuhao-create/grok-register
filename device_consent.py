@@ -5,8 +5,10 @@ from DrissionPage import ChromiumPage, ChromiumOptions
 from curl_cffi import requests as cf_req
 
 CLIENT_ID = 'b1a00492-073a-47ea-816f-4c329264a828'
-PROXY = os.getenv('CLIPROXY', 'http://REDACTED:22403')
-OUTPUT = r'D:\CLIProxyAPIPlus\auths'
+PROXY = os.getenv('CLIPROXY') or ''
+if not PROXY:
+    raise SystemExit('缺少 CLIPROXY 环境变量 (真实代理 IP)')
+OUTPUT = os.getenv('CPA_AUTHS_DIR') or r'D:\CLIProxyAPIPlus\auths'
 KEYS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'keys')
 
 lines = [l.strip() for l in open(os.path.join(KEYS_DIR, 'accounts.txt'), encoding='utf-8')
