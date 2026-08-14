@@ -49,7 +49,7 @@ Copy `.env.example` to `.env` and fill in:
 | Variable | Required | Description |
 |---|---|---|
 | `YESCAPTCHA_KEY` | Yes | YesCaptcha API key for Turnstile solving |
-| `EMAIL_PROVIDER` | No | Email provider: `luckmail` / `mailnest` / `gptmail` (default: `luckmail`) |
+| `EMAIL_PROVIDER` | No | Email provider: `luckmail` / `mailnest` / `gptmail` / `tmail` / `fce` / `gmail` (default: `luckmail`) |
 | `LUCKMAIL_API_KEY` | If luckmail | LuckMail API key |
 | `LUCKMAIL_PROJECT_CODE` | No | LuckMail project code (default: `grok`) |
 | `LUCKMAIL_EMAIL_TYPE` | No | Email type (default: `ms_imap`) |
@@ -59,6 +59,20 @@ Copy `.env.example` to `.env` and fill in:
 | `GROK2API_USER` | No | API gateway admin user (default: `admin`) |
 | `GROK2API_PASS` | No | API gateway admin password |
 | `GROK_PROXY` | No | HTTP proxy for registration (default: `http://127.0.0.1:7897`) |
+
+### Email providers (email domains matter for xAI)
+
+| Provider | Cost | Email domain | Headed Chrome | Notes |
+|---|---|---|---|---|
+| `luckmail` (default) | Paid (¥0.02/inbox) | Outlook.com addresses | No | Verified for Grok codes (76-99s) |
+| `gmail` | Free | Your own Gmail (+alias) | No | Highest trust; set `GMAIL_BASE_EMAIL` + `GMAIL_APP_PASSWORD` |
+| `fce` | Free | Platform domains: `@ditapi.info`, `@fce.email` | No | Pure REST API; set `FCE_API_KEY`. **Gmail/Outlook addresses are NOT accepted as inboxes; custom domains require paid plans ($29/mo+)**. Free tier has rate limits; OTP endpoint returns `__DETECTED__` on free tier — codes are parsed from messages instead |
+| `tmail` | Free | Shared eu.org domains | Yes | Anonymous, no key |
+| `gptmail` | Free | Shared disposable domains | Yes | xAI does not deliver codes to these domains (use for other platforms) |
+| `mailnest` | Paid | Outlook-based | No | Set `MAILNEST_API_KEY` + `MAILNEST_PROJECT_CODE` |
+
+> ⚠️ xAI actively blocks shared disposable-mail domains (mail.tm, gptmail domains). For Grok
+> registration prefer `luckmail` (Outlook addresses) or `gmail` (your own domain).
 
 ## Usage
 
