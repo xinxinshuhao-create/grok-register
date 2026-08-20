@@ -73,7 +73,7 @@ Copy `.env.example` to `.env` and fill in:
 | `mailnest` | Paid | Outlook-based | No | Set `MAILNEST_API_KEY` + `MAILNEST_PROJECT_CODE` |
 
 > ⚠️ xAI actively blocks shared disposable-mail domains (mail.tm, gptmail domains). For Grok
-> registration prefer `luckmail` (Outlook addresses) or `gmail`/`outlook` (your own accounts).
+> registration, prefer `luckmail` (Outlook addresses) or `gmail`/`outlook` (your own accounts).
 > **Maintainer's production setup uses `luckmail`.** The free providers above are provided as
 > options for other users; their availability may change without notice.
 
@@ -163,7 +163,7 @@ These are the models you get immediately after registration — no SuperGrok sub
 
 > ✅ All four models above have been tested and confirmed working end-to-end.
 >
-> **Note**: After Grok 4.6 release, xAI removed `grok-4.5` from the Build pool — it now works via OAuth direct connection. `grok-4.6` is the current Build pool model. Use `remint_oauth.py` to re-mint tokens if xAI revokes them.
+> **Note**: After the Grok 4.6 release, xAI removed `grok-4.5` from the Build pool — it now works via OAuth direct connection. `grok-4.6` is the current Build pool model. Use `remint_oauth.py` to re-mint tokens if xAI revokes them.
 
 ### Paid (requires SuperGrok / Heavy subscription)
 
@@ -178,7 +178,7 @@ The following models are available in the codebase but require a paid account ti
 | `grok-imagine-image-edit` | Image editing | Super |
 | `grok-imagine-video` | Video generation | Super |
 
-Other Build/Console models available via Device Flow: `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`, `grok-4.20-multi-agent-0309`, `grok-build-0.1` (code/composer, 256K output).
+Other Build/Console models are available via Device Flow: `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`, `grok-4.20-multi-agent-0309`, `grok-build-0.1` (code/composer, 256K output).
 
 ## OAuth Device Flow
 
