@@ -38,6 +38,10 @@ stop_event = threading.Event()
 success_count = 0
 completed_count = 0
 target_count = 0  # 0 = 无限
+# 每个线程的最大尝试次数（每次尝试 = 购买 1 个邮箱）。
+# 0 = 不限制（旧行为，危险：付费邮箱源下会无限烧钱）。
+# 2026-09-27 新增：默认 20，防止注册持续失败时无限购买邮箱。
+MAX_ATTEMPTS = int(os.getenv("GROK_MAX_ATTEMPTS") or 20)
 start_time = time.time()
 EMAIL_PROVIDER = str(os.getenv("EMAIL_PROVIDER") or "luckmail").strip().lower()
 
@@ -104,7 +108,13 @@ def register_single_thread(email_provider: str = "gptmail"):
         print("[-] 线程退出：缺少 Action ID")
         return
 
+    attempts = 0
     while not stop_event.is_set():
+        # 尝试次数上限：每次循环会购买 1 个邮箱，付费邮箱源下必须封顶
+        if MAX_ATTEMPTS > 0 and attempts >= MAX_ATTEMPTS:
+            print(f"[-] 线程-{threading.get_ident()} 已达尝试上限 {MAX_ATTEMPTS} 次，退出")
+            break
+        attempts += 1
         try:
             with requests.Session(impersonate="chrome120", proxies=PROXIES) as session:
                 # 预热连接

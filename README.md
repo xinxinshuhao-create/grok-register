@@ -182,6 +182,7 @@ Copy `.env.example` to `.env` and fill in:
 | `GROK_PROXY` | No | HTTP proxy for registration (default: `http://127.0.0.1:7897`) |
 | `DEVICE_PROXY` | No | Proxy used by `device_mint.py` (falls back to `GROK_PROXY`) |
 | `CPA_AUTHS_DIR` | No | Output dir for minted CPA auth files (default: `D:\CLIProxyAPIPlus\auths`) |
+| `GROK_MAX_ATTEMPTS` | No | Per-thread attempt cap; **each attempt buys one mailbox**. Default `20`. Set `0` to disable the cap (pre-2026-09-27 behaviour — dangerous with paid providers: an unbounded retry loop once burned 250 paid LuckMail inboxes in 43 minutes) |
 
 ### Email providers (email domains matter for xAI)
 
